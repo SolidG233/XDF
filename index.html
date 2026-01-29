@@ -2,8 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>朋友圈宣发图合成</title>
+    <!-- 优化 viewport 设置，禁止用户缩放页面，由 canvas 内部接管缩放 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>朋友圈宣发图合成（手机适配版）</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -13,43 +14,45 @@
             min-height: 100vh;
             background-color: #f0f2f5;
             margin: 0;
-            padding: 20px;
+            padding: 10px; /* 手机端减小边距 */
             user-select: none;
+            -webkit-user-select: none;
         }
 
         .container {
             background: white;
-            padding: 30px;
+            padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             text-align: center;
             max-width: 1000px;
             width: 100%;
+            box-sizing: border-box;
         }
 
-        h2 { color: #333; margin-bottom: 10px; }
-        p { color: #666; font-size: 14px; margin-bottom: 20px; }
+        h2 { color: #333; margin-bottom: 10px; font-size: 1.2rem;}
+        p { color: #666; font-size: 13px; margin-bottom: 15px; }
 
         /* 顶部上传按钮区域 */
         .top-bar {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             justify-content: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border-bottom: 1px solid #eee;
-            padding-bottom: 20px;
+            padding-bottom: 15px;
             flex-wrap: wrap;
         }
 
         input[type="file"] { display: none; }
 
         .btn {
-            border: 2px solid #007bff;
+            border: 1px solid #007bff;
             color: #007bff;
             background-color: white;
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 14px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
@@ -68,35 +71,45 @@
         /* --- 核心布局：左右结构 --- */
         .editor-wrapper {
             display: flex;
-            flex-direction: row;
-            align-items: flex-start;
+            flex-direction: column-reverse; /* 手机端画布在上方，控制在下方，这里反转显示顺序 */
+            align-items: center;
             justify-content: center;
-            gap: 30px;
-            flex-wrap: wrap;
+            gap: 20px;
+            width: 100%;
         }
 
-        /* --- 左侧：控制面板 --- */
+        /* 大屏幕恢复左右布局 */
+        @media (min-width: 768px) {
+            .editor-wrapper {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+        }
+
+        /* --- 左侧（手机端下方）：控制面板 --- */
         .sidebar {
-            width: 280px;
+            width: 100%;
+            max-width: 350px;
             background: #f8f9fa;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             text-align: left;
+            box-sizing: border-box;
         }
 
         .control-group {
             margin-bottom: 5px;
             border-bottom: 1px dashed #e0e0e0;
-            padding-bottom: 10px;
+            padding-bottom: 8px;
         }
         .control-group:last-child { border-bottom: none; }
         
         .control-group label {
             display: block;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             color: #555;
             margin-bottom: 5px;
@@ -112,15 +125,18 @@
 
         .tip { font-size: 12px; color: #999; line-height: 1.5; background: #fff; padding: 10px; border-radius: 4px; border: 1px dashed #ccc;}
 
-        /* --- 右侧：画布区域 --- */
+        /* --- 右侧（手机端上方）：画布区域 --- */
         #canvas-container {
             border: 1px solid #ccc;
             background-color: #e0e0e0;
-            padding: 10px;
+            padding: 5px;
             display: flex;
             justify-content: center;
             align-items: center;
             border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         canvas {
@@ -131,7 +147,8 @@
             background-color: white;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             display: block;
-            /* 默认手型 */
+            /* 关键：禁止CSS触摸动作，交给JS处理 */
+            touch-action: none; 
             cursor: grab; 
         }
         canvas:active { cursor: grabbing; }
@@ -207,9 +224,9 @@
 
                 <div class="tip">
                     <b>操作提示：</b><br>
-                    • <b>照片</b>：鼠标拖拽移动，滚轮缩放<br>
-                    • <b>可选元素</b>：直接鼠标拖拽移动，滚轮缩放<br>
-                    • 边框固定在下方
+                    • <b>单指</b>：拖拽移动位置<br>
+                    • <b>双指</b>：捏合缩放大小<br>
+                    • 优先选中“可选元素”，否则操作“照片”
                 </div>
 
                 <button id="download-btn" onclick="downloadCanvas()">下载图片</button>
@@ -352,11 +369,9 @@
             overlay2Loaded = true;
             sidebar.style.display = 'flex';
             
-            // 初始化 Overlay2 尺寸和位置
-            ov2State.scale = 0.3; // 默认30%
+            ov2State.scale = 0.3; 
             updateOverlay2Dimensions();
             
-            // 默认放在左上角稍微偏移一点
             ov2State.x = 50;
             ov2State.y = 50;
 
@@ -403,7 +418,6 @@
             const val = parseInt(overlay2ScaleSlider.value);
             overlay2ScaleVal.innerText = val + "%";
             
-            // 保持中心点缩放逻辑
             const oldW = ov2State.width;
             const oldH = ov2State.height;
             const centerX = ov2State.x + oldW / 2;
@@ -435,17 +449,13 @@
                    my >= ov2State.y && my <= ov2State.y + ov2State.height;
         }
 
-        // --- Mouse Events (Smart Interaction) ---
-        
+        // --- Mouse Events (Desktop) ---
         canvas.addEventListener('mousedown', (e) => {
             if (!bgLoaded) return;
-            
             const pos = getCanvasCoordinates(e);
             
-            // 判断是否点击了 Overlay2 (优先级高于背景)
             if (isMouseOnOverlay2(pos.x, pos.y)) {
                 dragTarget = 'overlay2';
-                // 视觉反馈
                 canvas.style.cursor = 'move';
             } else {
                 dragTarget = 'bg';
@@ -460,11 +470,10 @@
         window.addEventListener('mouseup', () => {
             isDragging = false;
             dragTarget = null;
-            canvas.style.cursor = 'grab'; // 恢复默认
+            canvas.style.cursor = 'grab'; 
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            // 悬停效果：如果没在拖拽，检测鼠标位置改变光标
             if (!isDragging && overlay2Loaded) {
                 const pos = getCanvasCoordinates(e);
                 if (isMouseOnOverlay2(pos.x, pos.y)) {
@@ -507,14 +516,11 @@
             const wheel = e.deltaY < 0 ? 1 : -1;
             const zoomFactor = Math.exp(wheel * zoomIntensity);
 
-            // 判定滚轮是在 Overlay2 上还是在背景上
             if (isMouseOnOverlay2(pos.x, pos.y)) {
-                // --- 缩放 Overlay 2 ---
                 let newScale = ov2State.scale * zoomFactor;
                 if (newScale < 0.05) newScale = 0.05;
                 if (newScale > 1.0) newScale = 1.0;
 
-                // 以鼠标为中心缩放 (简化版：以图片中心缩放体验更好)
                 const oldW = ov2State.width;
                 const oldH = ov2State.height;
                 const centerX = ov2State.x + oldW / 2;
@@ -526,13 +532,11 @@
                 ov2State.x = centerX - ov2State.width / 2;
                 ov2State.y = centerY - ov2State.height / 2;
 
-                // 同步滑块
                 const sliderVal = Math.round(ov2State.scale * 100);
                 overlay2ScaleSlider.value = sliderVal;
                 overlay2ScaleVal.innerText = sliderVal + "%";
 
             } else {
-                // --- 缩放 背景 ---
                 let newScale = bgState.scale * zoomFactor;
                 const minScale = bgState.baseScale * 0.1;
                 const maxScale = bgState.baseScale * 5.0;
@@ -540,7 +544,6 @@
                 if (newScale < minScale) newScale = minScale;
                 if (newScale > maxScale) newScale = maxScale;
 
-                // 以鼠标位置为中心缩放背景
                 const mouseX = pos.x;
                 const mouseY = pos.y;
 
@@ -555,6 +558,159 @@
 
             draw();
         }, { passive: false });
+
+        // ==========================================
+        // === 手机端触摸事件 (Touch Events) 新增部分 ===
+        // ==========================================
+        
+        let initialPinchDistance = null;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+
+        // 计算两指距离
+        function getDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // 获取触摸点的 Canvas 坐标
+        function getTouchPos(touch) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (touch.clientX - rect.left) * scaleX,
+                y: (touch.clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (!bgLoaded) return;
+            e.preventDefault(); // 防止滚动
+
+            if (e.touches.length === 1) {
+                // 单指：开始拖拽
+                const touch = e.touches[0];
+                const pos = getTouchPos(touch);
+
+                if (isMouseOnOverlay2(pos.x, pos.y)) {
+                    dragTarget = 'overlay2';
+                } else {
+                    dragTarget = 'bg';
+                }
+                isDragging = true;
+                lastTouchX = touch.clientX;
+                lastTouchY = touch.clientY;
+
+            } else if (e.touches.length === 2) {
+                // 双指：开始缩放
+                initialPinchDistance = getDistance(e.touches);
+                
+                // 判断中心点是否在 overlay2 上，决定缩放谁
+                // 简单起见：如果第一个手指在 overlay2 上，就缩放 overlay2，否则缩放背景
+                const pos = getTouchPos(e.touches[0]);
+                if (isMouseOnOverlay2(pos.x, pos.y)) {
+                    dragTarget = 'overlay2';
+                } else {
+                    dragTarget = 'bg';
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!bgLoaded) return;
+            e.preventDefault(); // 关键：禁止页面滚动
+
+            // --- Case 1: 双指缩放 ---
+            if (e.touches.length === 2 && initialPinchDistance > 0) {
+                const currentDistance = getDistance(e.touches);
+                const scaleFactor = currentDistance / initialPinchDistance;
+
+                if (dragTarget === 'overlay2') {
+                    // 缩放 Overlay2
+                    let newScale = ov2State.scale * scaleFactor;
+                    if (newScale < 0.05) newScale = 0.05;
+                    if (newScale > 1.0) newScale = 1.0;
+
+                    // 保持中心缩放
+                    const oldW = ov2State.width;
+                    const oldH = ov2State.height;
+                    const centerX = ov2State.x + oldW / 2;
+                    const centerY = ov2State.y + oldH / 2;
+
+                    ov2State.scale = newScale;
+                    updateOverlay2Dimensions();
+
+                    ov2State.x = centerX - ov2State.width / 2;
+                    ov2State.y = centerY - ov2State.height / 2;
+
+                    // 同步滑块
+                    const sliderVal = Math.round(ov2State.scale * 100);
+                    overlay2ScaleSlider.value = sliderVal;
+                    overlay2ScaleVal.innerText = sliderVal + "%";
+
+                } else {
+                    // 缩放 背景
+                    let newScale = bgState.scale * scaleFactor;
+                    const minScale = bgState.baseScale * 0.1;
+                    const maxScale = bgState.baseScale * 5.0;
+                    
+                    if (newScale < minScale) newScale = minScale;
+                    if (newScale > maxScale) newScale = maxScale;
+
+                    // 简单中心缩放（相对于当前视图中心）
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    
+                    // 重新计算位置以保持中心不动
+                    bgState.x = centerX - (centerX - bgState.x) * (newScale / bgState.scale);
+                    bgState.y = centerY - (centerY - bgState.y) * (newScale / bgState.scale);
+                    
+                    bgState.scale = newScale;
+
+                    // 同步滑块
+                    const sliderVal = Math.round((bgState.scale / bgState.baseScale) * 100);
+                    bgScaleSlider.value = sliderVal;
+                    bgScaleVal.innerText = sliderVal + "%";
+                }
+
+                // 更新基准距离，实现连续平滑缩放
+                initialPinchDistance = currentDistance;
+                draw();
+            }
+            // --- Case 2: 单指拖拽 ---
+            else if (e.touches.length === 1 && isDragging) {
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - lastTouchX;
+                const deltaY = touch.clientY - lastTouchY;
+
+                const displayWidth = canvas.clientWidth; 
+                const scaleFactor = canvas.width / displayWidth; 
+                const moveX = deltaX * scaleFactor;
+                const moveY = deltaY * scaleFactor;
+
+                if (dragTarget === 'overlay2') {
+                    ov2State.x += moveX;
+                    ov2State.y += moveY;
+                } else if (dragTarget === 'bg') {
+                    bgState.x += moveX;
+                    bgState.y += moveY;
+                }
+
+                lastTouchX = touch.clientX;
+                lastTouchY = touch.clientY;
+                draw();
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+                isDragging = false;
+                initialPinchDistance = null;
+                dragTarget = null;
+            }
+        });
 
         // --- Main Draw Function ---
         function draw() {
@@ -587,7 +743,6 @@
 
             // 3. Draw Overlay 2 (Movable)
             if (overlay2Loaded) {
-                // 绘制边框提示选中（可选，这里为了美观暂不画边框，只画图）
                 ctx.drawImage(overlay2Img, ov2State.x, ov2State.y, ov2State.width, ov2State.height);
             }
         }
