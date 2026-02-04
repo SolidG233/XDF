@@ -2,9 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 优化 viewport 设置，禁止用户缩放页面，由 canvas 内部接管缩放 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>朋友圈宣发图合成（手机适配版）</title>
+    <title>朋友圈宣发图合成（含预设边框）</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -14,7 +13,7 @@
             min-height: 100vh;
             background-color: #f0f2f5;
             margin: 0;
-            padding: 10px; /* 手机端减小边距 */
+            padding: 10px;
             user-select: none;
             -webkit-user-select: none;
         }
@@ -38,7 +37,7 @@
             display: flex;
             gap: 8px;
             justify-content: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             border-bottom: 1px solid #eee;
             padding-bottom: 15px;
             flex-wrap: wrap;
@@ -71,14 +70,13 @@
         /* --- 核心布局：左右结构 --- */
         .editor-wrapper {
             display: flex;
-            flex-direction: column-reverse; /* 手机端画布在上方，控制在下方，这里反转显示顺序 */
+            flex-direction: column-reverse;
             align-items: center;
             justify-content: center;
             gap: 20px;
             width: 100%;
         }
 
-        /* 大屏幕恢复左右布局 */
         @media (min-width: 768px) {
             .editor-wrapper {
                 flex-direction: row;
@@ -86,7 +84,6 @@
             }
         }
 
-        /* --- 左侧（手机端下方）：控制面板 --- */
         .sidebar {
             width: 100%;
             max-width: 350px;
@@ -115,6 +112,46 @@
             margin-bottom: 5px;
         }
 
+        /* --- 预设列表样式 (整合在 sidebar 内) --- */
+        .preset-list {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 5px 2px;
+            margin-bottom: 10px;
+            /* 隐藏滚动条但允许滚动 */
+            -ms-overflow-style: none;  
+            scrollbar-width: none;  
+        }
+        .preset-list::-webkit-scrollbar { display: none; }
+
+        .preset-item {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            object-fit: contain;
+            background: #fff;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+        .preset-item:hover { border-color: #aaa; }
+        .preset-item.active { border-color: #007bff; background: #e7f1ff; box-shadow: 0 0 0 2px rgba(0,123,255,0.2); }
+
+        /* 无边框按钮的特殊样式 */
+        .preset-item.no-border {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #999;
+            font-weight: bold;
+            background: #eee;
+            border-style: dashed;
+        }
+
         .slider-row {
             display: flex;
             align-items: center;
@@ -125,7 +162,6 @@
 
         .tip { font-size: 12px; color: #999; line-height: 1.5; background: #fff; padding: 10px; border-radius: 4px; border: 1px dashed #ccc;}
 
-        /* --- 右侧（手机端上方）：画布区域 --- */
         #canvas-container {
             border: 1px solid #ccc;
             background-color: #e0e0e0;
@@ -147,7 +183,6 @@
             background-color: white;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             display: block;
-            /* 关键：禁止CSS触摸动作，交给JS处理 */
             touch-action: none; 
             cursor: grab; 
         }
@@ -183,7 +218,7 @@
             </label>
 
             <label class="btn btn-secondary">
-                ② 边框固定
+                ② 上传自定义边框
                 <input type="file" id="overlay-input" accept="image/*">
             </label>
 
@@ -198,6 +233,8 @@
             
             <!-- 左侧：控制栏 -->
             <div id="sidebar-controls" class="sidebar" style="display:none;">
+                
+                <!-- 1. 照片控制 -->
                 <div class="control-group">
                     <label>照片缩放</label>
                     <div class="slider-row">
@@ -206,14 +243,43 @@
                     </div>
                 </div>
 
+                <!-- 2. 边框控制 (新增预设) -->
                 <div class="control-group">
-                    <label>边框固定</label>
+                    <label>边框固定 (选择预设)</label>
+                    
+                    <!-- 预设列表 -->
+                    <div class="preset-list" id="overlay-presets">
+                        <!-- 选项：无 -->
+                        <div class="preset-item no-border active" onclick="clearOverlay(this)" title="清除边框">无</div>
+                        
+                        <!-- 预设1：红色边框示例 -->
+                        <img src="https://img.heliar.top/file/1770190870106_bianchen.png?text=样式A" 
+                             data-src="https://img.heliar.top/file/1770188878509_编程.png?text=样式A" 
+                             class="preset-item" onclick="selectPreset(this)">
+                        
+                        <!-- 预设2：蓝色边框示例 -->
+                        <img src="https://img.heliar.top/file/1770190867979_shufa.png?text=样式B" 
+                             data-src="https://img.heliar.top/file/1770189046089_书法.png?text=样式B" 
+                             class="preset-item" onclick="selectPreset(this)">
+                        
+                        <!-- 预设3：金色边框示例 -->
+                        <img src="https://img.heliar.top/file/1770190868839_meishu.png?text=样式C" 
+                             data-src="https://img.heliar.top/file/1770189047263_美术.png?text=样式C" 
+                             class="preset-item" onclick="selectPreset(this)">
+
+                        <!-- 预设4：金色边框示例 -->
+                        <img src="https://img.heliar.top/file/1770190869728_jiqiren.png?text=样式C" 
+                             data-src="https://img.heliar.top/file/1770189047443_机器人.png?text=样式C" 
+                             class="preset-item" onclick="selectPreset(this)">
+                    </div>
+
                     <div class="slider-row">
                         <input type="range" id="overlay-scale-slider" min="5" max="100" value="100">
                         <span id="overlay-scale-val" class="slider-value">100%</span>
                     </div>
                 </div>
 
+                <!-- 3. 元素控制 -->
                 <div class="control-group">
                     <label>可选元素</label>
                     <div class="slider-row">
@@ -278,30 +344,97 @@
         let overlay2Loaded = false;
 
         // Transform States
-        // 底图状态
         let bgState = { x: 0, y: 0, scale: 1, baseScale: 1 };
-        // 叠加图2状态 (x,y 是左上角坐标，scale是相对于画布宽度的比例)
         let ov2State = { x: 0, y: 0, scale: 0.3, width: 0, height: 0 };
 
         // Interaction States
         let isDragging = false;
-        let dragTarget = null; // 'bg' or 'overlay2'
+        let dragTarget = null;
         let lastMouseX = 0;
         let lastMouseY = 0;
 
-        function drawInit() {
-            ctx.fillStyle = "#f8f9fa";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = "#ddd";
-            ctx.lineWidth = 20;
-            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        // --- 核心修改：预设边框逻辑 ---
+        
+        // 选择预设边框
+        function selectPreset(element) {
+            // 移除所有激活状态
+            document.querySelectorAll('.preset-item').forEach(el => el.classList.remove('active'));
+            // 激活当前点击项
+            element.classList.add('active');
+
+            // 获取图片地址 (优先使用 data-src，如果没有则使用 src)
+            const src = element.getAttribute('data-src') || element.src;
+
+            overlayImg.crossOrigin = "Anonymous"; 
+            overlayImg.src = src;
+        }
+
+        // 清除边框
+        function clearOverlay(element) {
+            document.querySelectorAll('.preset-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
             
-            ctx.fillStyle = "#aaa";
-            ctx.font = "bold 80px Arial";
+            overlayLoaded = false;
+            overlayImg.src = ""; // 清空源
+            draw();
+        }
+
+        // --- 初始预览图逻辑 ---
+        const defaultPreviewUrl = ''; 
+        const defaultBgImg = new Image();
+        defaultBgImg.crossOrigin = "Anonymous";
+        defaultBgImg.src = defaultPreviewUrl;
+
+        defaultBgImg.onload = () => {
+            if (!bgLoaded) {
+                drawInit();
+            }
+        }
+
+        function drawInit() {
+            if (!defaultBgImg.complete) {
+                ctx.fillStyle = "#f8f9fa";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+
+            // 绘制背景图
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const imgRatio = defaultBgImg.width / defaultBgImg.height;
+            const canvasRatio = canvas.width / canvas.height;
+            
+            let renderW, renderH, renderX, renderY;
+
+            if (imgRatio > canvasRatio) {
+                renderH = canvas.height;
+                renderW = renderH * imgRatio;
+                renderX = (canvas.width - renderW) / 2;
+                renderY = 0;
+            } else {
+                renderW = canvas.width;
+                renderH = renderW / imgRatio;
+                renderX = 0;
+                renderY = (canvas.height - renderH) / 2;
+            }
+
+            ctx.drawImage(defaultBgImg, renderX, renderY, renderW, renderH);
+
+            // 遮罩和文字
+            ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 80px 'Microsoft YaHei', sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("预览区域", canvas.width/2, canvas.height/2);
+            ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+            ctx.shadowBlur = 20;
+            ctx.fillText("请点击上方按钮上传照片", canvas.width/2, canvas.height/2);
+            ctx.shadowBlur = 0;
         }
+        
         drawInit();
 
         // --- 1. Background Logic ---
@@ -341,6 +474,10 @@
         overlayInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
+            
+            // 清除预设的高亮状态
+            document.querySelectorAll('.preset-item').forEach(el => el.classList.remove('active'));
+
             const reader = new FileReader();
             reader.onload = (event) => {
                 overlayImg.src = event.target.result;
@@ -349,9 +486,12 @@
         });
 
         overlayImg.onload = () => {
-            overlayLoaded = true;
-            sidebar.style.display = 'flex';
-            draw();
+            // 只有当 src 不为空时才标记为 loaded
+            if (overlayImg.src && overlayImg.src !== window.location.href) {
+                overlayLoaded = true;
+                sidebar.style.display = 'flex';
+                draw();
+            }
         };
 
         // --- 3. Overlay 2 Logic (Movable) ---
@@ -559,22 +699,17 @@
             draw();
         }, { passive: false });
 
-        // ==========================================
-        // === 手机端触摸事件 (Touch Events) 新增部分 ===
-        // ==========================================
-        
+        // --- Touch Events ---
         let initialPinchDistance = null;
         let lastTouchX = 0;
         let lastTouchY = 0;
 
-        // 计算两指距离
         function getDistance(touches) {
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        // 获取触摸点的 Canvas 坐标
         function getTouchPos(touch) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -587,10 +722,9 @@
 
         canvas.addEventListener('touchstart', (e) => {
             if (!bgLoaded) return;
-            e.preventDefault(); // 防止滚动
+            e.preventDefault();
 
             if (e.touches.length === 1) {
-                // 单指：开始拖拽
                 const touch = e.touches[0];
                 const pos = getTouchPos(touch);
 
@@ -604,11 +738,7 @@
                 lastTouchY = touch.clientY;
 
             } else if (e.touches.length === 2) {
-                // 双指：开始缩放
                 initialPinchDistance = getDistance(e.touches);
-                
-                // 判断中心点是否在 overlay2 上，决定缩放谁
-                // 简单起见：如果第一个手指在 overlay2 上，就缩放 overlay2，否则缩放背景
                 const pos = getTouchPos(e.touches[0]);
                 if (isMouseOnOverlay2(pos.x, pos.y)) {
                     dragTarget = 'overlay2';
@@ -620,20 +750,17 @@
 
         canvas.addEventListener('touchmove', (e) => {
             if (!bgLoaded) return;
-            e.preventDefault(); // 关键：禁止页面滚动
+            e.preventDefault();
 
-            // --- Case 1: 双指缩放 ---
             if (e.touches.length === 2 && initialPinchDistance > 0) {
                 const currentDistance = getDistance(e.touches);
                 const scaleFactor = currentDistance / initialPinchDistance;
 
                 if (dragTarget === 'overlay2') {
-                    // 缩放 Overlay2
                     let newScale = ov2State.scale * scaleFactor;
                     if (newScale < 0.05) newScale = 0.05;
                     if (newScale > 1.0) newScale = 1.0;
 
-                    // 保持中心缩放
                     const oldW = ov2State.width;
                     const oldH = ov2State.height;
                     const centerX = ov2State.x + oldW / 2;
@@ -645,13 +772,11 @@
                     ov2State.x = centerX - ov2State.width / 2;
                     ov2State.y = centerY - ov2State.height / 2;
 
-                    // 同步滑块
                     const sliderVal = Math.round(ov2State.scale * 100);
                     overlay2ScaleSlider.value = sliderVal;
                     overlay2ScaleVal.innerText = sliderVal + "%";
 
                 } else {
-                    // 缩放 背景
                     let newScale = bgState.scale * scaleFactor;
                     const minScale = bgState.baseScale * 0.1;
                     const maxScale = bgState.baseScale * 5.0;
@@ -659,27 +784,22 @@
                     if (newScale < minScale) newScale = minScale;
                     if (newScale > maxScale) newScale = maxScale;
 
-                    // 简单中心缩放（相对于当前视图中心）
                     const centerX = canvas.width / 2;
                     const centerY = canvas.height / 2;
                     
-                    // 重新计算位置以保持中心不动
                     bgState.x = centerX - (centerX - bgState.x) * (newScale / bgState.scale);
                     bgState.y = centerY - (centerY - bgState.y) * (newScale / bgState.scale);
                     
                     bgState.scale = newScale;
 
-                    // 同步滑块
                     const sliderVal = Math.round((bgState.scale / bgState.baseScale) * 100);
                     bgScaleSlider.value = sliderVal;
                     bgScaleVal.innerText = sliderVal + "%";
                 }
 
-                // 更新基准距离，实现连续平滑缩放
                 initialPinchDistance = currentDistance;
                 draw();
             }
-            // --- Case 2: 单指拖拽 ---
             else if (e.touches.length === 1 && isDragging) {
                 const touch = e.touches[0];
                 const deltaX = touch.clientX - lastTouchX;
@@ -724,11 +844,12 @@
                 const h = bgImg.height * bgState.scale;
                 ctx.drawImage(bgImg, bgState.x, bgState.y, w, h);
             } else {
+                // 如果没有背景图，调用初始绘制函数
                 drawInit();
                 return;
             }
 
-            // 2. Draw Overlay 1 (Bottom Right)
+            // 2. Draw Overlay 1 (Fixed)
             if (overlayLoaded) {
                 const scale = overlayScaleSlider.value / 100;
                 const newWidth = canvas.width * scale;
