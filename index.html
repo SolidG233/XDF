@@ -67,6 +67,19 @@
         .btn-purple { border-color: #6f42c1; color: #6f42c1; }
         .btn-purple:hover { background-color: #6f42c1; color: white; }
 
+        /* 红色清除按钮样式 */
+        .btn-danger-sm {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: auto; /* 靠右对齐 */
+        }
+        .btn-danger-sm:hover { background-color: #c82333; }
+
         /* --- 核心布局：左右结构 --- */
         .editor-wrapper {
             display: flex;
@@ -104,12 +117,19 @@
         }
         .control-group:last-child { border-bottom: none; }
         
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
         .control-group label {
             display: block;
             font-size: 13px;
             font-weight: bold;
             color: #555;
-            margin-bottom: 5px;
+            margin: 0;
         }
 
         /* --- 预设列表样式 (整合在 sidebar 内) --- */
@@ -236,7 +256,9 @@
                 
                 <!-- 1. 照片控制 -->
                 <div class="control-group">
-                    <label>照片缩放</label>
+                    <div class="control-header">
+                        <label>照片缩放</label>
+                    </div>
                     <div class="slider-row">
                         <input type="range" id="bg-scale-slider" min="10" max="500" value="100">
                         <span id="bg-scale-val" class="slider-value">100%</span>
@@ -245,7 +267,9 @@
 
                 <!-- 2. 边框控制 (新增预设) -->
                 <div class="control-group">
-                    <label>边框固定 (选择预设)</label>
+                    <div class="control-header">
+                        <label>边框固定 (选择预设)</label>
+                    </div>
                     
                     <!-- 预设列表 -->
                     <div class="preset-list" id="overlay-presets">
@@ -273,15 +297,16 @@
                              class="preset-item" onclick="selectPreset(this)">
                     </div>
 
-                    <div class="slider-row">
-                        <input type="range" id="overlay-scale-slider" min="5" max="100" value="100">
-                        <span id="overlay-scale-val" class="slider-value">100%</span>
-                    </div>
+                    <!-- 修改点：删除了边框缩放滑块 -->
                 </div>
 
                 <!-- 3. 元素控制 -->
                 <div class="control-group">
-                    <label>可选元素</label>
+                    <div class="control-header">
+                        <label>可选元素</label>
+                        <!-- 新增：清除按钮 -->
+                        <button class="btn-danger-sm" onclick="clearOverlay2()" id="clear-overlay2-btn" style="display:none;">清除元素</button>
+                    </div>
                     <div class="slider-row">
                         <input type="range" id="overlay2-scale-slider" min="5" max="100" value="30">
                         <span id="overlay2-scale-val" class="slider-value">30%</span>
@@ -317,15 +342,16 @@
         const overlay2Input = document.getElementById('overlay2-input');
         
         const sidebar = document.getElementById('sidebar-controls');
+        const clearOverlay2Btn = document.getElementById('clear-overlay2-btn');
         
         // Sliders
         const bgScaleSlider = document.getElementById('bg-scale-slider');
-        const overlayScaleSlider = document.getElementById('overlay-scale-slider');
+        // 修改点：删除了 overlayScaleSlider 的引用
         const overlay2ScaleSlider = document.getElementById('overlay2-scale-slider');
 
         // Values display
         const bgScaleVal = document.getElementById('bg-scale-val');
-        const overlayScaleVal = document.getElementById('overlay-scale-val');
+        // 修改点：删除了 overlayScaleVal 的引用
         const overlay2ScaleVal = document.getElementById('overlay2-scale-val');
 
         // Canvas Resolution
@@ -377,6 +403,15 @@
             
             overlayLoaded = false;
             overlayImg.src = ""; // 清空源
+            draw();
+        }
+
+        // --- 新增：清除可选元素逻辑 ---
+        function clearOverlay2() {
+            overlay2Loaded = false;
+            overlay2Img.src = ""; // 清空源
+            overlay2Input.value = ""; // 清空 input file，允许重复选择同一文件
+            clearOverlay2Btn.style.display = 'none'; // 隐藏清除按钮
             draw();
         }
 
@@ -509,6 +544,7 @@
         overlay2Img.onload = () => {
             overlay2Loaded = true;
             sidebar.style.display = 'flex';
+            clearOverlay2Btn.style.display = 'inline-block'; // 显示清除按钮
             
             ov2State.scale = 0.3; 
             updateOverlay2Dimensions();
@@ -549,10 +585,7 @@
             draw();
         });
 
-        overlayScaleSlider.addEventListener('input', () => {
-            overlayScaleVal.innerText = overlayScaleSlider.value + "%";
-            draw();
-        });
+        // 修改点：删除了 overlayScaleSlider 的事件监听
 
         overlay2ScaleSlider.addEventListener('input', () => {
             if (!overlay2Loaded) return;
@@ -852,7 +885,8 @@
 
             // 2. Draw Overlay 1 (Fixed)
             if (overlayLoaded) {
-                const scale = overlayScaleSlider.value / 100;
+                // 修改点：强制使用 100% 比例 (1.0)
+                const scale = 1.0;
                 const newWidth = canvas.width * scale;
                 const ratio = overlayImg.height / overlayImg.width;
                 const newHeight = newWidth * ratio;
@@ -882,5 +916,3 @@
     </script>
 </body>
 </html>
-
-
