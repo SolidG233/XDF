@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>朋友圈宣发图合成</title>
+    <title>朋友圈宣发图合成（青少专用）</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -193,14 +193,13 @@
             width: 100%;
             box-sizing: border-box;
             overflow: hidden;
-            position: relative; /* 为绝对定位的img做参照 */
+            min-height: 300px; /* 保证容器有高度 */
         }
 
         canvas {
             width: 100%;           
             max-width: 350px;      
             height: auto;          
-            aspect-ratio: 2/3;
             background-color: white;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             display: block;
@@ -209,23 +208,6 @@
         }
         canvas:active { cursor: grabbing; }
 
-        /* 新增：覆盖在 Canvas 上方的图片样式 */
-        #result-img {
-            position: absolute;
-            top: 5px; /* 对应 padding */
-            left: 50%;
-            transform: translateX(-50%);
-            width: calc(100% - 10px); /* 减去左右 padding */
-            max-width: 350px;
-            height: auto;
-            aspect-ratio: 2/3;
-            opacity: 0; /* 默认透明，只用于接收长按事件 */
-            z-index: 10;
-            pointer-events: auto; /* 允许点击 */
-            -webkit-touch-callout: default; /* 允许iOS长按菜单 */
-        }
-
-        /* 电脑端按钮样式 */
         #download-btn {
             background-color: #28a745;
             color: white;
@@ -240,16 +222,45 @@
         }
         #download-btn:hover { background-color: #218838; }
 
-        /* 手机端提示样式 */
-        #mobile-tip {
+        /* --- 新增：手机端保存图片的模态框样式 --- */
+        .save-modal {
             display: none;
-            color: #d9534f;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .save-modal img {
+            max-width: 90%;
+            max-height: 75vh;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 2px solid white;
+        }
+        .save-tip {
+            color: white;
+            margin-top: 15px;
+            font-size: 16px;
             font-weight: bold;
-            margin-top: 10px;
-            padding: 10px;
-            background: #fdf2f2;
-            border-radius: 6px;
-            border: 1px solid #ebccd1;
+            text-shadow: 0 1px 2px black;
+            text-align: center;
+        }
+        .close-modal-btn {
+            margin-top: 15px;
+            padding: 8px 25px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
         }
 
     </style>
@@ -258,9 +269,9 @@
 
     <div class="container">
         <h2>朋友圈宣发图合成</h2>
-        <!-- 移除之前的红色提示，改为动态显示 -->
         <p>如有疑问联系：江苏省域-市场营销部-郭昊灵</p>
-        
+
+
         <!-- 顶部：上传按钮 -->
         <div class="top-bar">
             <label class="btn">
@@ -302,7 +313,7 @@
                         <label>边框固定 (选择预设)</label>
                     </div>
                     
-                    <!-- 预设列表 -->
+             <!-- 预设列表 -->
                     <div class="preset-list" id="overlay-presets">
                         <!-- 选项：无 -->
                         <div class="preset-item no-border active" onclick="clearOverlay(this)" title="清除边框">无</div>
@@ -329,6 +340,7 @@
                     </div>
                 </div>
 
+
                 <!-- 3. 元素控制 -->
                 <div class="control-group">
                     <div class="control-header">
@@ -346,31 +358,30 @@
                     <b>操作提示：</b><br>
                     • <b>单指</b>：拖拽移动位置<br>
                     • <b>双指</b>：捏合缩放大小<br>
-                    • 边框图片需要加载一会哦~<br>
                     • 优先选中“可选元素”，否则操作“照片”
                 </div>
 
-                <!-- 电脑端显示下载按钮 -->
-                <button id="download-btn" onclick="downloadCanvas()">下载图片</button>
-                
-                <!-- 手机端显示长按提示 -->
-                <div id="mobile-tip">图片合成完毕，请长按右侧（或下方）图片保存</div>
+                <button id="download-btn" onclick="downloadCanvas()">生成/下载图片</button>
             </div>
 
             <!-- 右侧：画布 -->
             <div id="canvas-container">
                 <canvas id="myCanvas"></canvas>
-                <!-- 新增：用于手机端长按保存的透明图片 -->
-                <img id="result-img" alt="合成结果">
             </div>
 
         </div>
     </div>
 
+    <!-- 新增：手机端长按保存的模态框 -->
+    <div id="mobile-save-modal" class="save-modal">
+        <img id="mobile-save-img" src="" alt="生成的图片">
+        <div class="save-tip">请长按图片保存到相册</div>
+        <button class="close-modal-btn" onclick="closeSaveModal()">关闭</button>
+    </div>
+
     <script>
         const canvas = document.getElementById('myCanvas');
         const ctx = canvas.getContext('2d');
-        const resultImg = document.getElementById('result-img');
         
         // Inputs
         const bgInput = document.getElementById('bg-input');
@@ -379,8 +390,6 @@
         
         const sidebar = document.getElementById('sidebar-controls');
         const clearOverlay2Btn = document.getElementById('clear-overlay2-btn');
-        const downloadBtn = document.getElementById('download-btn');
-        const mobileTip = document.getElementById('mobile-tip');
         
         // Sliders
         const bgScaleSlider = document.getElementById('bg-scale-slider');
@@ -390,11 +399,13 @@
         const bgScaleVal = document.getElementById('bg-scale-val');
         const overlay2ScaleVal = document.getElementById('overlay2-scale-val');
 
-        // Canvas Resolution
-        const FIXED_WIDTH = 2000;
-        const FIXED_HEIGHT = 3000;
-        canvas.width = FIXED_WIDTH;
-        canvas.height = FIXED_HEIGHT;
+        // Canvas Resolution Settings (Fixed Portrait)
+        const BASE_SIZE = 2000;
+        const RATIO_LONG = 3000;
+        
+        // 强制竖版
+        canvas.width = BASE_SIZE;
+        canvas.height = RATIO_LONG;
 
         // Image Objects
         let bgImg = new Image();
@@ -416,28 +427,23 @@
         let lastMouseX = 0;
         let lastMouseY = 0;
 
-        // --- 检测设备类型 ---
-        function isMobile() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
+        function resetBgPosition() {
+            const canvasRatio = canvas.width / canvas.height;
+            const imgRatio = bgImg.width / bgImg.height;
 
-        // 初始化界面显示逻辑
-        function initInterface() {
-            if (isMobile()) {
-                downloadBtn.style.display = 'none';
-                mobileTip.style.display = 'block';
-                // 手机端：图片位于最上层，用于长按，但要允许点击穿透进行操作？
-                // 难点：如果img在canvas上面，就无法操作canvas了。
-                // 解决方案：操作时隐藏img，操作结束后（touchend）更新并显示img。
-                resultImg.style.pointerEvents = 'none'; // 默认不阻挡操作
+            if (imgRatio > canvasRatio) {
+                bgState.baseScale = canvas.height / bgImg.height;
             } else {
-                downloadBtn.style.display = 'block';
-                mobileTip.style.display = 'none';
-                resultImg.style.display = 'none'; // 电脑端不需要这个img
+                bgState.baseScale = canvas.width / bgImg.width;
             }
-        }
-        initInterface();
 
+            bgState.scale = bgState.baseScale;
+            bgState.x = (canvas.width - bgImg.width * bgState.scale) / 2;
+            bgState.y = (canvas.height - bgImg.height * bgState.scale) / 2;
+
+            bgScaleSlider.value = 100;
+            bgScaleVal.innerText = "100%";
+        }
 
         // --- 核心修改：预设边框逻辑 ---
         function selectPreset(element) {
@@ -465,10 +471,9 @@
         }
 
         // --- 初始预览图逻辑 ---
-        const defaultPreviewUrl = ''; 
         const defaultBgImg = new Image();
         defaultBgImg.crossOrigin = "Anonymous";
-        defaultBgImg.src = defaultPreviewUrl;
+        defaultBgImg.src = ''; // 保持为空或设置默认图
 
         defaultBgImg.onload = () => {
             if (!bgLoaded) {
@@ -477,16 +482,26 @@
         }
 
         function drawInit() {
-            if (!defaultBgImg.complete) {
-                ctx.fillStyle = "#f8f9fa";
+            if (!defaultBgImg.complete || defaultBgImg.src === "" || defaultBgImg.src.endsWith("html")) {
+                // 纯色背景 + 文字提示
+                ctx.fillStyle = "#f0f2f5";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = "#999";
+                ctx.font = "bold 80px 'Microsoft YaHei', sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("请点击上方按钮上传照片", canvas.width/2, canvas.height/2);
                 return;
             }
+
+            // 绘制背景图
             ctx.fillStyle = "white";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             const imgRatio = defaultBgImg.width / defaultBgImg.height;
             const canvasRatio = canvas.width / canvas.height;
+            
             let renderW, renderH, renderX, renderY;
 
             if (imgRatio > canvasRatio) {
@@ -500,6 +515,7 @@
                 renderX = 0;
                 renderY = (canvas.height - renderH) / 2;
             }
+
             ctx.drawImage(defaultBgImg, renderX, renderY, renderW, renderH);
 
             ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
@@ -514,6 +530,7 @@
             ctx.fillText("请点击上方按钮上传照片", canvas.width/2, canvas.height/2);
             ctx.shadowBlur = 0;
         }
+        
         drawInit();
 
         // --- 1. Background Logic ---
@@ -530,26 +547,11 @@
         bgImg.onload = () => {
             bgLoaded = true;
             sidebar.style.display = 'flex';
-            
-            const canvasRatio = canvas.width / canvas.height;
-            const imgRatio = bgImg.width / bgImg.height;
-
-            if (imgRatio > canvasRatio) {
-                bgState.baseScale = canvas.height / bgImg.height;
-            } else {
-                bgState.baseScale = canvas.width / bgImg.width;
-            }
-
-            bgState.scale = bgState.baseScale;
-            bgState.x = (canvas.width - bgImg.width * bgState.scale) / 2;
-            bgState.y = (canvas.height - bgImg.height * bgState.scale) / 2;
-
-            bgScaleSlider.value = 100;
-            bgScaleVal.innerText = "100%";
+            resetBgPosition(); // 使用封装好的重置逻辑
             draw();
         };
 
-        // --- 2. Overlay 1 Logic ---
+        // --- 2. Overlay 1 Logic (Fixed Bottom Right) ---
         overlayInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -569,7 +571,7 @@
             }
         };
 
-        // --- 3. Overlay 2 Logic ---
+        // --- 3. Overlay 2 Logic (Movable) ---
         overlay2Input.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -770,7 +772,7 @@
             draw();
         }, { passive: false });
 
-        // --- Touch Events (Mobile) ---
+        // --- Touch Events ---
         let initialPinchDistance = null;
         let lastTouchX = 0;
         let lastTouchY = 0;
@@ -791,21 +793,8 @@
             };
         }
 
-        // 手机端交互核心逻辑：
-        // 1. 开始触摸时，隐藏覆盖层img，确保能操作canvas
-        // 2. 结束触摸时，更新覆盖层img，并显示，确保能长按保存
-        
-        // 监听容器的触摸事件，而不是canvas，因为img可能挡住了canvas
-        const container = document.getElementById('canvas-container');
-
-        container.addEventListener('touchstart', (e) => {
+        canvas.addEventListener('touchstart', (e) => {
             if (!bgLoaded) return;
-            // 只要开始操作，就隐藏结果图，允许操作canvas
-            if(isMobile()) {
-                resultImg.style.opacity = '0';
-                resultImg.style.pointerEvents = 'none';
-            }
-
             e.preventDefault();
 
             if (e.touches.length === 1) {
@@ -832,7 +821,7 @@
             }
         }, { passive: false });
 
-        container.addEventListener('touchmove', (e) => {
+        canvas.addEventListener('touchmove', (e) => {
             if (!bgLoaded) return;
             e.preventDefault();
 
@@ -908,64 +897,13 @@
             }
         }, { passive: false });
 
-        container.addEventListener('touchend', (e) => {
+        canvas.addEventListener('touchend', (e) => {
             if (e.touches.length === 0) {
                 isDragging = false;
                 initialPinchDistance = null;
                 dragTarget = null;
-                
-                // 操作结束，如果是手机端，更新img并显示，允许长按
-                if(isMobile() && bgLoaded) {
-                    updateResultImage();
-                }
             }
         });
-
-        // 更新覆盖层图片
-        function updateResultImage() {
-            if (!isMobile()) return;
-            // 短暂延迟确保绘制完成
-            setTimeout(() => {
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                resultImg.src = dataUrl;
-                resultImg.style.opacity = '0'; // 保持视觉不可见，但存在
-                // 实际上为了让用户看到canvas的高清渲染，我们可以让img完全透明覆盖在上面
-                // 或者直接显示img。为了操作流畅性，这里选择：
-                // img 覆盖在 canvas 上，opacity设为0，但 pointer-events 设为 auto
-                // 这样用户长按时，按到的是 img。
-                // 但是！如果 pointer-events 为 auto，就会阻挡下一次的 touchstart 传给 canvas
-                // 所以逻辑是：平时 img pointer-events: auto (为了长按)，
-                // 一旦 touchstart 触发（由于事件冒泡或者捕获，或者我们给img也加监听），就隐藏img
-                
-                resultImg.style.pointerEvents = 'auto'; 
-            }, 50);
-        }
-        
-        // 给 resultImg 也加上 touchstart，以便在用户点击它准备拖动时，迅速穿透下去
-        resultImg.addEventListener('touchstart', (e) => {
-             // 只有当不是长按意图（比如立即移动）时才需要穿透，但浏览器很难区分
-             // 简单的做法：只要触摸了，就隐藏img，把控制权交给下方的canvas
-             // 但这样会导致长按失效。
-             
-             // 修正策略：
-             // 手机端不使用 pointer-events 切换。
-             // 始终让 img 处于 pointer-events: none; 状态（无法长按）
-             // 只有当用户停止操作一段时间后，或者点击了一个“生成”按钮后，才显示 img。
-             
-             // 鉴于用户体验，我们采用最通用的方案：
-             // 1. 默认 img 隐藏 (pointer-events: none)
-             // 2. 每次 draw() 结束后，更新 img src
-             // 3. 只有当用户手指离开屏幕 (touchend) 后，设置 img pointer-events: auto
-             // 4. 当用户再次手指按下 (touchstart 捕获阶段)，设置 img pointer-events: none
-        });
-        
-        // 重新绑定 container 的 touchstart，使用捕获阶段，确保最先触发
-        container.addEventListener('touchstart', (e) => {
-            if(isMobile()) {
-                resultImg.style.pointerEvents = 'none'; // 允许穿透操作
-            }
-        }, { capture: true });
-
 
         // --- Main Draw Function ---
         function draw() {
@@ -989,8 +927,10 @@
                 const newWidth = canvas.width * scale;
                 const ratio = overlayImg.height / overlayImg.width;
                 const newHeight = newWidth * ratio;
+
                 const x = canvas.width - newWidth; 
                 const y = canvas.height - newHeight;
+
                 ctx.drawImage(overlayImg, x, y, newWidth, newHeight);
             }
 
@@ -998,20 +938,39 @@
             if (overlay2Loaded) {
                 ctx.drawImage(overlay2Img, ov2State.x, ov2State.y, ov2State.width, ov2State.height);
             }
-            
-            // 每次绘制完，如果是手机端，更新结果图（为了长按保存）
-            // 注意：频繁 toDataURL 会卡顿，所以只在 touchend 更新，这里只做标记
         }
 
+        // --- 新增：检测是否为移动设备 ---
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // --- 修改：下载/保存逻辑 ---
         function downloadCanvas() {
             if (!bgLoaded) { alert("请先上传底图"); return; }
+            
             const imageUrl = canvas.toDataURL('image/jpeg', 0.92);
-            const link = document.createElement('a');
-            link.href = imageUrl;
-            link.download = `宣发图-${Date.now()}.jpg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+
+            if (isMobile()) {
+                // 手机端：显示模态框供长按保存
+                const modal = document.getElementById('mobile-save-modal');
+                const img = document.getElementById('mobile-save-img');
+                img.src = imageUrl;
+                modal.style.display = 'flex';
+            } else {
+                // 电脑端：直接下载
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.download = `宣发图-${Date.now()}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // --- 新增：关闭模态框 ---
+        function closeSaveModal() {
+            document.getElementById('mobile-save-modal').style.display = 'none';
         }
     </script>
 </body>
